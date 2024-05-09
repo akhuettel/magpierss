@@ -104,7 +104,7 @@ class MagpieRSS {
      *                                  source encoding. (caveat emptor)
      *
      */
-    function __construct ($source, $output_encoding='ISO-8859-1', 
+    function __construct ($source, $output_encoding='UTF-8', 
                         $input_encoding=null, $detect_encoding=true) 
     {   
         #
@@ -818,110 +818,12 @@ class MagpieRSS {
     }
 
     #
-    # return XML parser, and possibly re-encoded source
+    # return XML parser, and possibly re-encoded source. we output utf-8.
     #
     
     function create_parser($source, $out_enc, $in_enc, $detect) {
-        if ( substr(phpversion(),0,1) == 5) {
-            $parser = $this->php5_create_parser($in_enc, $detect);
-        }
-        else {
-            list($parser, $source) = $this->php4_create_parser($source, $in_enc, $detect);
-        }
-        if ($out_enc) {
-            $this->encoding = $out_enc;
-            xml_parser_set_option($parser, XML_OPTION_TARGET_ENCODING, $out_enc);
-        }
-        
+        $parser = xml_parser_create();
         return array($parser, $source);
-    }
-    
-    #
-    # Instantiate an XML parser under PHP5
-    #
-    # PHP5 will do a fine job of detecting input encoding
-    # if passed an empty string as the encoding. 
-    #
-    # All hail libxml2!
-    #
-    
-    function php5_create_parser($in_enc, $detect) {
-        
-        # by default php5 does a fine job of detecting input encodings
-        if(!$detect && $in_enc) {
-            return xml_parser_create($in_enc);
-        }
-        else {
-            return xml_parser_create('');
-        }
-    }
-    
-    #
-    # Instaniate an XML parser under PHP4
-    #
-    # Unfortunately PHP4's support for character encodings
-    # and especially XML and character encodings sucks.  As
-    # long as the documents you parse only contain characters
-    # from the ISO-8859-1 character set (a superset of ASCII,
-    # and a subset of UTF-8) you're fine.  However once you
-    # step out of that comfy little world things get mad, bad,
-    # and dangerous to know.
-    #
-    # The following code is based on SJM's work with FoF
-    # @see http://minutillo.com/steve/weblog/2004/6/17/php-xml-and-character-encodings-a-tale-of-sadness-rage-and-data-loss
-    #
-    
-    function php4_create_parser($source, $in_enc, $detect) {
-        if ( !$detect ) {
-            return array(xml_parser_create($in_enc), $source);
-        }
-        
-        if (!$in_enc) {
-            if (preg_match('/<?xml.*encoding=[\'"](.*?)[\'"].*?>/m', $source, $m)) {
-                $in_enc = strtoupper($m[1]);
-                $this->source_encoding = $in_enc;
-            }
-            else {
-                $in_enc = 'UTF-8';
-            }
-        }
-        
-        if ($this->known_encoding($in_enc)) {
-            return array(xml_parser_create($in_enc), $source);
-        }
-        
-        # the dectected encoding is not one of the simple encodings PHP knows
-        
-        # attempt to use the iconv extension to
-        # cast the XML to a known encoding
-        # @see http://php.net/iconv
-       
-        if (function_exists('iconv'))  {
-            $encoded_source = iconv($in_enc,'UTF-8', $source);
-            if ($encoded_source) {
-                return array(xml_parser_create('UTF-8'), $encoded_source);
-            }
-        }
-        
-        # iconv didn't work, try mb_convert_encoding
-        # @see http://php.net/mbstring
-        
-        if( function_exists('mb_convert_encoding')) {
-            $encoded_source = mb_convert_encoding($source, 'UTF-8', $in_enc );
-            if ($encoded_source) {
-                return array(xml_parser_create('UTF-8'), $encoded_source);
-            }
-        }
-        
-        #
-        # else 
-        #
-        
-        $this->error("Feed is in an unsupported character encoding. ($in_enc) " .
-                     "You may see strange artifacts, and mangled characters.",
-                     E_USER_NOTICE);
-            
-        return array(xml_parser_create(), $source);
     }
     
     function known_encoding($enc) {
